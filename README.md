@@ -1,81 +1,71 @@
-NodeMCU Flasher
-===============
+import socket import cv2 import numpy as np import struct import google.generativeai as genai import os import csv from datetime import datetime
 
-NodeMCU flasher is a firmware programmer for NodeMCU DEVKIT V0.9.
+1. Initialize Lingo Brain
+os.environ["GEMINI_API_KEY"] = "YOUR_API_KEY" genai.configure(api_key=os.environ["GEMINI_API_KEY"]) model = genai.GenerativeModel('gemini-1.5-flash')
 
-You can use it to program NodeMCU DEVKIT or your own ESP8266 board.
+def log_guardian_insight(insight): """Saves Michael's prosperity data to a CSV for long-term tracking.""" file_path = 'guardian_logs.csv' file_exists = os.path.isfile(file_path)
 
-You MUST set GPIO0 to LOW before programming, and NodeMCU DEVKIT V0.9 will do it automatically.
+with open(file_path, mode='a', newline='', encoding='utf-8') as file:
+    writer = csv.writer(file)
+    if not file_exists:
+        writer.writerow(['Timestamp', 'Guardian_Insight'])
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    writer.writerow([timestamp, insight])
+def start_guardian_server(): server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) server_socket.bind(('0.0.0.0', 8080)) server_socket.listen(5) print("Aigis Central: Waiting for Sofia's vision...")
 
-This is demo version.
+conn, addr = server_socket.accept()
+print(f"Guardian Handshake: Sofia connected from {addr}")
 
-We are working on next version and will use QT framework. 
+data = b""
+payload_size = struct.calcsize("Q") 
+frame_count = 0
 
-It will be cross platform and open source.
-
-Usage
----------------
-Just click flash and you can burn firmware to ESP8266. Before you doing it, GPIO0 MUST LOW.
-
-![Begin program](Resources/Images/NodeMCU-Flasher-Begin.png)
-
-And wait a moment.
-
-![Programming](Resources/Images/NodeMCU-Flasher-Programming.png)
-
-Program success.
-
-![Program success](Resources/Images/NodeMCU-Flasher-Success.png)
-
-Setting your own firmware.
-
-![Setting](Resources/Images/NodeMCU-Flasher-Setting.png)
-
-When the path have some error(e.g. file not exist), the line will become red.
-
-Tips: You could use some special path to do something interesting.
-
-The blank.bin file:
-
-INTERNAL://BLANK
-
-The esp_init_data_default.bin file(for 26MHz crystal):
-
-INTERNAL://DEFAULTimport cv2
-
-def start_sofia_vision():
-    # 1. Initialize the camera (0 is usually the default webcam)
-    camera = cv2.VideoCapture(0)
-
-    if not camera.isOpened():
-        print("Error: Could not open Sofia's camera.")
-        return
-
-    print("Sofia is now looking...")
-
+try:
     while True:
-        # 2. Capture frame-by-frame
-        ret, frame = camera.read()
+        # Socket handling...
+        while len(data) < payload_size:
+            packet = conn.recv(4096)
+            if not packet: break
+            data += packet
+        if not data: break
+        packed_msg_size = data[:payload_size]; data = data[payload_size:]
+        msg_size = struct.unpack("Q", packed_msg_size)[0]
+        while len(data) < msg_size:
+            data += conn.recv(4096)
+        frame_data = data[:msg_size]; data = data[msg_size:]
+        
+        # Frame Decoding
+        nparr = np.frombuffer(frame_data, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        if not ret:
-            print("Error: Failed to grab visual data.")
-            break
+        if frame is not None:
+            cv2.imshow('Sofia - Guardian Stream', frame)
+            
+            # Aigis Safety Protocol
+            frame_count += 1
+            if frame_count % 900 == 0:  # ~30 second intervals
+                print("Sofia: Analyzing environment for Michael's prosperity...")
+                
+                _, img_encoded = cv2.imencode('.jpg', frame)
+                vision_msg = {"mime_type": "image/jpeg", "data": img_encoded.tobytes()}
+                
+                prompt = "Guardian Sofia reporting. Analyze Michael's environment for safety and prosperity."
+                
+                try:
+                    response = model.generate_content([prompt, vision_msg])
+                    insight = response.text
+                    print(f"\n[LINGO BRAIN]: {insight}\n")
+                    
+                    # PERSISTENCE: Save to Michael's Ledger
+                    log_guardian_insight(insight)
+                    
+                except Exception as e:
+                    print(f"Vision Analysis Error: {e}")
 
-        # 3. (Optional) Convert to grayscale for easier 'learning' processing
-        # gray_vision = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # 4. Display the resulting frame
-        cv2.imshow('Sofia Vision Feed', frame)
-
-        # 5. Break the loop if the 'q' key is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-
-    # 6. Release the hardware and close windows
-    camera.release()
+finally:
+    conn.close()
     cv2.destroyAllWindows()
-    print("Sofia has closed her eyes.")
-
-if __name__ == "__main__":
-    start_sofia_vision()
-
+if name == "main": start_guardian_server()
